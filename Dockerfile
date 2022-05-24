@@ -250,3 +250,5 @@ RUN cd /tmp && \
     cd /tmp && \
     rm -rf nco-* && \
     ldconfig
+
+ENTRYPOINT ["/bin/sh", "-c", "tail -f /dev/null"]
