@@ -48,7 +48,6 @@ RUN cd /tmp && \
     make install && \
     cd /tmp && \
     rm -rf szip-* && \
-    cd /tmp && \
     # install zlib
     wget https://downloads.sourceforge.net/project/libpng/zlib/1.2.11/zlib-1.2.11.tar.gz && \
     tar -zxvf zlib-1.2.11.tar.gz && \
@@ -66,7 +65,7 @@ RUN cd /tmp && \
     cd /tmp && \
     rm -rf hdf5-*
 
-# install netcdf
+# install netcdf and pnetcdf
 RUN cd /tmp && \
     # install netcdf-c
     wget https://downloads.unidata.ucar.edu/netcdf-c/4.8.1/netcdf-c-4.8.1.tar.gz && \
@@ -91,7 +90,26 @@ RUN cd /tmp && \
     ./configure --disable-dependency-tracking --disable-dap-remote-tests --enable-static --enable-shared --prefix=/usr/local && \
     make -j$J install && \
     cd /tmp && \
-    rm -rf netcdf-fortran-*
+    rm -rf netcdf-fortran-* && \
+    echo 'export NETCDF=/usr/local' >> /etc/bash.bashrc && \
+    echo 'export NETCDF_ROOT=/usr/local' >> /etc/bash.bashrc && \
+    # install openmpi
+    wget https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.3.tar.gz && \
+    tar -zxvf openmpi-4.1.3.tar.gz && \
+    cd openmpi-4.1.3 && \
+    ./configure --disable-dependency-tracking --disable-silent-rules --disable-debug --enable-shared --with-hwloc=internal --prefix=/usr/local && \
+    make all -j20 && make install && \
+    cd /tmp && \
+    rm -rf openmpi-* && \
+    # install pnetcdf
+    wget https://parallel-netcdf.github.io/Release/pnetcdf-1.12.3.tar.gz && \
+    tar -zxvf pnetcdf-1.12.3.tar.gz && \
+    cd pnetcdf-1.12.3 && \
+    CC=gcc CXX=g++ F77=gfortran F90=gfortran FC=gfortran MPICC=mpicc MPICXX=mpicxx MPIF77=mpif77 MPIF90=mpif90 ./configure --prefix=/usr/local --enable-static --enable-shared && \
+    make -j $J install && \
+    cd /tmp && \
+    rm -rf pnetcdf-* && \
+    echo 'export PNETCDF=/usr/local' >> /etc/bash.bashrc
 
 # install eccodes
 RUN cd /tmp && \
@@ -120,6 +138,8 @@ RUN cd /tmp && \
     make -j$J install && \
     cd /tmp && \
     rm -rf jasper-* && \
+    echo 'export JASPERLIB=/usr/local/lib' >> /etc/bash.bashrc && \
+    echo 'export JASPERINC=/usr/local/include' >> /etc/bash.bashrc && \
     # install ecbuild
     wget https://github.com/ecmwf/ecbuild/archive/refs/tags/3.6.5.tar.gz && \
     mv 3.6.5.tar.gz ecbuild-3.6.5.tar.gz && \
