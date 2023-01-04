@@ -1,42 +1,55 @@
-FROM ubuntu:20.04
+FROM ubuntu:20.04 AS build
+
+RUN sed -i 's/archive.ubuntu.com/mirrors.ustc.edu.cn/g' /etc/apt/sources.list && \
+    sed -i 's/security.ubuntu.com/mirrors.ustc.edu.cn/g' /etc/apt/sources.list
 
 ENV TIME_ZONE Asia/Shanghai
 
-ARG DEBIAN_FRONTEND=noninteractive
-RUN sed -i 's/archive.ubuntu.com/mirrors.ustc.edu.cn/g' /etc/apt/sources.list && \
-    sed -i 's/security.ubuntu.com/mirrors.ustc.edu.cn/g' /etc/apt/sources.list && \
-    apt-get update && \
-    # install timezone
-    apt-get install -y tzdata && \
+RUN apt-get update -y && \
+    DEBIAN_FRONTEND=noninteractive \
+    apt-get install -y --no-install-recommends tzdata && \
     ln -sf /usr/share/zoneinfo/$TIME_ZONE /etc/localtime && \
     echo $TIME_ZONE > /etc/timezone && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update -y && \
+    DEBIAN_FRONTEND=noninteractive \
     apt-get install -y --no-install-recommends \
-    ca-certificates pkg-config gnupg libarchive13 libgsl-dev libxrender1 libfontconfig1 libxext6 \
-    openssh-server openssh-client net-tools build-essential \
-    csh vim curl wget git make cmake m4 unzip xz-utils && \
+    ca-certificates pkg-config gnupg libgsl-dev \
+    libpng-dev libxrender1 libfontconfig1 libxext6 \
+    openssh-server openssh-client build-essential \
+    csh ksh vim curl wget git autoconf automake make cmake \
+    m4 unzip xz-utils file && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update -y && \
+    DEBIAN_FRONTEND=noninteractive \
     apt-get install -y gcc-10 gfortran-10 g++-10 && \
     cd /usr/bin && \
     ln -sf gfortran-10 gfortran && \
     ln -sf g++-10 g++ && \
-    ln -sf gcc-10 gcc
+    ln -sf gcc-10 gcc && \
+    ln -sf gcc-ar-10 gcc-ar && \
+    ln -sf gcc-nm-10 gcc-nm && \
+    ln -sf gcc-ranlib-10 gcc-ranlib && \
+    ln -sf gcov-10 gcov && \
+    ln -sf gcov-dump-10 gcov-dump && \
+    ln -sf gcov-tool-10 gcov-tool && \
+    ln -sf cpp-10 cpp && \
+    rm -rf /var/lib/apt/lists/*
 
-# Compiler environment variables
-# ENV CC /usr/bin/gcc
-# ENV FC /usr/bin/gfortran
 ENV J 12
-COPY *.tar.gz /tmp/
+COPY libgfortran.tar.gz /tmp/
+
 # install NCL
 RUN cd /tmp && \
     wget https://www.earthsystemgrid.org/api/v1/dataset/ncl.662.dap/file/ncl_ncarg-6.6.2-Debian9.8_64bit_gnu630.tar.gz && \
     tar -zxvf ncl_ncarg-6.6.2-Debian9.8_64bit_gnu630.tar.gz -C /usr/local && \
     rm ncl_ncarg-6.6.2-Debian9.8_64bit_gnu630.tar.gz && \
-    echo 'export NCARG_ROOT=/usr/local' >> /etc/bash.bashrc && \
-    tar -zxvf libgfortran.tar.gz && \
-    cp libgfortran.so.3.0.0 /usr/local/lib && \
+    tar -zxvf libgfortran.tar.gz -C /usr/local/lib && \
+    rm libgfortran.tar.gz && \
     cd /usr/local/lib && \
-    ln -sf libgfortran.so.3.0.0 libgfortran.so.3 && \
-    cd /tmp && \
-    rm -rf libgfortran.*
+    ln -sf libgfortran.so.3.0.0 libgfortran.so.3
 
 # install hdf5
 RUN cd /tmp && \
@@ -44,7 +57,7 @@ RUN cd /tmp && \
     wget https://support.hdfgroup.org/ftp/lib-external/szip/2.1.1/src/szip-2.1.1.tar.gz && \
     tar -zxvf szip-2.1.1.tar.gz && \
     cd szip-2.1.1 && \
-    ./configure --disable-dependency-tracking --disable-debug --prefix=/usr/local && \
+    ./configure --disable-dependency-tracking --prefix=/usr/local && \
     make install && \
     cd /tmp && \
     rm -rf szip-* && \
@@ -60,7 +73,7 @@ RUN cd /tmp && \
     wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.13/hdf5-1.13.1/src/hdf5-1.13.1.tar.gz && \
     tar -zxvf hdf5-1.13.1.tar.gz && \
     cd hdf5-1.13.1 && \
-    cmake -B build -DCMAKE_INSTALL_PREFIX=/usr/local -DHDF5_ENABLE_THREADSAFE=ON -DHDF5_ENABLE_Z_LIB_SUPPORT=ON -DHDF5_ENABLE_SZIP_SUPPORT=ON && \
+    cmake -B build -DCMAKE_INSTALL_PREFIX=/usr/local -DHDF5_ENABLE_Z_LIB_SUPPORT=ON -DHDF5_ENABLE_SZIP_SUPPORT=ON -DHDF5_BUILD_FORTRAN=ON && \
     cmake --build build --target install -- -j$J && \
     cd /tmp && \
     rm -rf hdf5-*
@@ -91,16 +104,14 @@ RUN cd /tmp && \
     make -j$J install && \
     cd /tmp && \
     rm -rf netcdf-fortran-* && \
-    echo 'export NETCDF=/usr/local' >> /etc/bash.bashrc && \
-    echo 'export NETCDF_ROOT=/usr/local' >> /etc/bash.bashrc && \
     # install openmpi
     wget https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.3.tar.gz && \
     tar -zxvf openmpi-4.1.3.tar.gz && \
     cd openmpi-4.1.3 && \
     ./configure --disable-dependency-tracking --disable-silent-rules --disable-debug --enable-shared --with-hwloc=internal --prefix=/usr/local && \
-    make all -j20 && make install && \
+    make all -j$J && make install && \
     cd /tmp && \
-    rm -rf openmpi-* && \
+    rm -rf openmpi-* && ldconfig && \
     # install pnetcdf
     wget https://parallel-netcdf.github.io/Release/pnetcdf-1.12.3.tar.gz && \
     tar -zxvf pnetcdf-1.12.3.tar.gz && \
@@ -108,8 +119,7 @@ RUN cd /tmp && \
     CC=gcc CXX=g++ F77=gfortran F90=gfortran FC=gfortran MPICC=mpicc MPICXX=mpicxx MPIF77=mpif77 MPIF90=mpif90 ./configure --prefix=/usr/local --enable-static --enable-shared && \
     make -j $J install && \
     cd /tmp && \
-    rm -rf pnetcdf-* && \
-    echo 'export PNETCDF=/usr/local' >> /etc/bash.bashrc
+    rm -rf pnetcdf-*
 
 # install eccodes
 RUN cd /tmp && \
@@ -138,8 +148,6 @@ RUN cd /tmp && \
     make -j$J install && \
     cd /tmp && \
     rm -rf jasper-* && \
-    echo 'export JASPERLIB=/usr/local/lib' >> /etc/bash.bashrc && \
-    echo 'export JASPERINC=/usr/local/include' >> /etc/bash.bashrc && \
     # install ecbuild
     wget https://github.com/ecmwf/ecbuild/archive/refs/tags/3.6.5.tar.gz && \
     mv 3.6.5.tar.gz ecbuild-3.6.5.tar.gz && \
@@ -268,7 +276,61 @@ RUN cd /tmp && \
     ./configure --enable-netcdf4 --enable-dap --enable-ncap2 --enable-udunits2 --disable-doc --prefix=/usr/local && \
     make -j$J install && \
     cd /tmp && \
-    rm -rf nco-* && \
+    rm -rf nco-*
+
+FROM ubuntu:20.04
+
+RUN sed -i 's/archive.ubuntu.com/mirrors.ustc.edu.cn/g' /etc/apt/sources.list && \
+    sed -i 's/security.ubuntu.com/mirrors.ustc.edu.cn/g' /etc/apt/sources.list
+
+ENV TIME_ZONE Asia/Shanghai
+
+RUN apt-get update -y && \
+    DEBIAN_FRONTEND=noninteractive \
+    apt-get install -y --no-install-recommends tzdata && \
+    ln -sf /usr/share/zoneinfo/$TIME_ZONE /etc/localtime && \
+    echo $TIME_ZONE > /etc/timezone && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update -y && \
+    DEBIAN_FRONTEND=noninteractive \
+    apt-get install -y --no-install-recommends \
+    ca-certificates pkg-config gnupg libgsl-dev \
+    libpng-dev libxrender1 libfontconfig1 libxext6 \
+    openssh-server openssh-client \
+    csh ksh vim curl wget git autoconf automake make cmake \
+    m4 unzip xz-utils file && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update -y && \
+    DEBIAN_FRONTEND=noninteractive \
+    apt-get install -y gcc-10 gfortran-10 g++-10 && \
+    cd /usr/bin && \
+    ln -sf gfortran-10 gfortran && \
+    ln -sf g++-10 g++ && \
+    ln -sf gcc-10 gcc && \
+    ln -sf gcc-ar-10 gcc-ar && \
+    ln -sf gcc-nm-10 gcc-nm && \
+    ln -sf gcc-ranlib-10 gcc-ranlib && \
+    ln -sf gcov-10 gcov && \
+    ln -sf gcov-dump-10 gcov-dump && \
+    ln -sf gcov-tool-10 gcov-tool && \
+    ln -sf cpp-10 cpp && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /usr/local/bin /usr/local/bin
+COPY --from=build /usr/local/include /usr/local/include
+COPY --from=build /usr/local/lib /usr/local/lib
+COPY --from=build /usr/local/cmake /usr/local/cmake
+COPY --from=build /usr/local/share /usr/local/share
+COPY --from=build /usr/local/man /usr/local/man
+
+RUN echo 'export NCARG_ROOT=/usr/local' >> /etc/bash.bashrc && \
+    echo 'export NETCDF=/usr/local' >> /etc/bash.bashrc && \
+    echo 'export NETCDF_ROOT=/usr/local' >> /etc/bash.bashrc && \
+    echo 'export PNETCDF=/usr/local' >> /etc/bash.bashrc && \
+    echo 'export JASPERLIB=/usr/local/lib' >> /etc/bash.bashrc && \
+    echo 'export JASPERINC=/usr/local/include' >> /etc/bash.bashrc && \
     ldconfig
 
 ENTRYPOINT ["/bin/sh", "-c", "tail -f /dev/null"]
