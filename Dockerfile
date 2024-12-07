@@ -38,7 +38,7 @@ RUN apt-get update -y && \
     ln -sf cpp-10 cpp && \
     rm -rf /var/lib/apt/lists/*
 
-ENV J 12
+ENV J 8
 COPY libgfortran.tar.gz /tmp/
 
 # install NCL
@@ -70,9 +70,9 @@ RUN cd /tmp && \
     cd /tmp && \
     rm -rf zlib-* && \
     # install hdf5
-    wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.13/hdf5-1.13.1/src/hdf5-1.13.1.tar.gz && \
-    tar -zxvf hdf5-1.13.1.tar.gz && \
-    cd hdf5-1.13.1 && \
+    wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.13/hdf5-1.13.0/src/hdf5-1.13.0.tar.gz && \
+    tar -zxvf hdf5-1.13.0.tar.gz && \
+    cd hdf5-1.13.0 && \
     cmake -B build -DCMAKE_INSTALL_PREFIX=/usr/local -DHDF5_ENABLE_Z_LIB_SUPPORT=ON -DHDF5_ENABLE_SZIP_SUPPORT=ON -DHDF5_BUILD_FORTRAN=ON && \
     cmake --build build --target install -- -j$J && \
     cd /tmp && \
