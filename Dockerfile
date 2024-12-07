@@ -141,11 +141,12 @@ RUN cd /tmp && \
     cd /tmp && \
     rm -rf jpeg* && \
     # install jasper
-    wget http://www.ece.uvic.ca/~mdadams/jasper/software/jasper-1.900.1.zip && \
-    unzip jasper-1.900.1.zip && \
-    cd jasper-1.900.1 && \
-    ./configure --disable-debug --disable-dependency-tracking --enable-shared --prefix=/usr/local && \
-    make -j$J install && \
+    wget http://www.ece.uvic.ca/~frodo/jasper/software/jasper-2.0.14.tar.gz && \
+    # tar -zxvf version-2.0.14.tar.gz && \
+    tar -zxvf jasper-2.0.14.tar.gz && \
+    cd jasper-2.0.14 && \
+    cmake -B build -DCMAKE_INSTALL_PREFIX=/usr/local -DJAS_ENABLE_OPENGL=Off -DJAS_ENABLE_DOC=Off && \
+    cmake --build build --target install && \
     cd /tmp && \
     rm -rf jasper-* && \
     # install ecbuild
